@@ -38,10 +38,6 @@ export PATH="$PATH:$ANDROID_HOME/tools:$ANDROID_HOME/platform-tools"
 case "$(uname -s)" in
   Darwin)
     export JAVA_HOME="$("/usr/libexec/java_home")"  # Java for Android Studio
-    onep_sock="$HOME/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock"
-    if [ -S "$onep_sock" ]; then
-      export SSH_AUTH_SOCK="$onep_sock"
-    fi
     if [ "$(uname -m)" = "arm64" ]; then
       eval "$(/opt/homebrew/bin/brew shellenv)"
       export PATH="/opt/homebrew/opt/ruby/bin:$PATH"
