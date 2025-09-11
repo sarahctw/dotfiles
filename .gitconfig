@@ -1,7 +1,6 @@
 [user]
 	name = James Wang
 	email = veriathon@gmail.com
-	signingkey = "~/.ssh/id_ed25519.pub"
 
 [color]
 	ui = auto
@@ -27,3 +26,6 @@
 
 [url "ssh://git@github.com/"]
 	insteadOf = https://github.com/
+
+[include]
+	path = .gitconfig.local

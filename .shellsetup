@@ -50,8 +50,61 @@ esac
 # Source .env if it exists in our dotfiles
 [ -f "$HOME/dotfiles/.env" ] && . "$HOME/dotfiles/.env"
 
-# OPAM configuration
-. $HOME/.opam/opam-init/init.sh > /dev/null 2> /dev/null || true
+# --- per-machine Git overlay + SSH signing bootstrap ---
+
+# Ensure per-machine overlay file exists
+touch "$HOME/.gitconfig.local"
+
+git_cfg_local() { git config --file "$HOME/.gitconfig.local" "$@"; }
+
+# Choose a private key for signing if present (write to LOCAL, not global)
+if [ -f "$HOME/.ssh/id_ed25519" ]; then
+  git_cfg_local user.signingkey "$HOME/.ssh/id_ed25519"
+elif [ -f "$HOME/.ssh/id_rsa" ]; then
+  git_cfg_local user.signingkey "$HOME/.ssh/id_rsa"
+fi
+
+# Resolve principals (emails): env var > existing git config > error out
+commit_emails=""
+if [ -n "${GIT_COMMIT_EMAILS:-}" ]; then
+  commit_emails="$GIT_COMMIT_EMAILS"
+else
+  commit_emails="$(git config --global --get user.email || true)"
+fi
+
+# Only proceed if we have emails and at least one key
+have_key=false
+for pub in "$HOME/.ssh/id_ed25519.pub" "$HOME/.ssh/id_rsa.pub"; do
+  [ -f "$pub" ] && have_key=true && break
+done
+
+if [ -z "$commit_emails" ]; then
+  >&2 echo "[git-ssh-signing] No commit emails set; skipping allowed_signers."
+elif [ "$have_key" = false ]; then
+  >&2 echo "[git-ssh-signing] No SSH public keys found; skipping allowed_signers."
+else
+  # You can keep gpg.format in the base .gitconfig if you prefer.
+  # If you want it per-machine, write it to the LOCAL overlay instead:
+  git_cfg_local gpg.format ssh
+  git_cfg_local gpg.ssh.allowedSignersFile "$HOME/.ssh/allowed_signers"
+
+  # Rebuild allowed_signers
+  mkdir -p "$HOME/.ssh"
+  : > "$HOME/.ssh/allowed_signers"
+  for pub in "$HOME/.ssh/id_ed25519.pub" "$HOME/.ssh/id_rsa.pub"; do
+    [ -f "$pub" ] || continue
+    printf "%s " "$commit_emails" >> "$HOME/.ssh/allowed_signers"
+    cat "$pub" >> "$HOME/.ssh/allowed_signers"
+  done
+  chmod 0644 "$HOME/.ssh/allowed_signers"
+fi
+
+# Ensure the base .gitconfig includes the local overlay (ONE entry)
+if ! git config --global --get-all include.path | grep -q ".gitconfig.local"; then
+  git config --global --add include.path ".gitconfig.local"
+fi
+
+# --- end bootstrap ---
 
 # Language-specific paths, require language-specific setups
 export PATH="$GOPATH/bin:$PATH"                         # add go binaries
